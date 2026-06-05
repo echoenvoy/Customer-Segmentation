@@ -72,7 +72,3 @@ CSV and Excel inputs are supported. Your file must contain these columns:
 | ActiveDays | Days between first and last purchase |
 | CancellationRate | Fraction of cancelled invoices |
 
-## Citation
-
-Chen, D. (2015). Online Retail [Dataset]. UCI Machine Learning Repository.  
-DOI: [10.24432/C5BW33](https://doi.org/10.24432/C5BW33)
