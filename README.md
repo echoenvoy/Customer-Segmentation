@@ -1,7 +1,6 @@
 # Customer Segmentation – RFM + K-Means Clustering
 
 **Team:** Hamza Amhidi & Mouaad Kaddouri  
-**Module:** AI & Data Science Basics – EHTP, S4  
 **Dataset:** [UCI Online Retail](https://archive.ics.uci.edu/dataset/352/online+retail)
 
 ---
