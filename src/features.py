@@ -103,14 +103,15 @@ def compute_cancellation_rate(raw: pd.DataFrame) -> pd.DataFrame:
     CancellationRate = cancelled_invoices / total_invoices
     A high rate may indicate problem customers or heavy returners.
     """
-    # Flag each invoice-row as cancelled or not
-    raw["IsCancelled"] = raw["InvoiceNo"].str.startswith("C")
+    # Deduplicate CustomerID and InvoiceNo so we evaluate at the unique invoice level
+    unique_inv = raw.drop_duplicates(subset=["CustomerID", "InvoiceNo"]).copy()
+    unique_inv["IsCancelled"] = unique_inv["InvoiceNo"].astype(str).str.startswith("C")
 
     cancel = (
-        raw.groupby("CustomerID")
+        unique_inv.groupby("CustomerID")
         .agg(
-            TotalInvoices      =("InvoiceNo",    "nunique"),
-            CancelledInvoices  =("IsCancelled",  "sum"),   # sum of True = count
+            TotalInvoices      =("InvoiceNo",    "count"),
+            CancelledInvoices  =("IsCancelled",  "sum"),   # sum of True = count of cancelled invoices
         )
         .reset_index()
     )
