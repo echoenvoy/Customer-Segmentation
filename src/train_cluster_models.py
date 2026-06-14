@@ -114,39 +114,44 @@ def find_optimal_k(X_scaled: np.ndarray, k_range=range(2, 9)) -> int:
 
 # -- Helper: cluster profiling -------------------------------------------------
 
-def profile_clusters(customers: pd.DataFrame) -> pd.DataFrame:
+def profile_clusters(customers: pd.DataFrame) -> tuple:
     """
     Compute mean feature values per cluster and assign a business label.
-
-    Labelling heuristic (applied in order of priority):
-      VIP          - high Monetary AND high Frequency AND low Recency
-      Loyal        - high Frequency AND low Recency (but not VIP monetary)
-      At-Risk      - high Recency (long time since last purchase)
-      New          - low ActiveDays AND low Frequency
-      Low-Value    - everything else (low frequency, low monetary)
+    We assign unique labels to each cluster based on a deterministic hierarchy.
     """
     profile = customers.groupby("Cluster")[CLUSTER_FEATURES].mean()
 
-    # Rank clusters on key dimensions (rank 0 = lowest)
-    r_recency   = profile["Recency"].rank()         # lower Recency is better
-    r_frequency = profile["Frequency"].rank(ascending=False)
-    r_monetary  = profile["Monetary"].rank(ascending=False)
-    r_active    = profile["ActiveDays"].rank(ascending=False)
+    assigned_labels = {}
+    remaining_clusters = list(profile.index)
 
-    labels = {}
-    for cluster in profile.index:
-        if r_monetary[cluster] == 1 and r_frequency[cluster] <= 2:
-            labels[cluster] = "VIP Customers"
-        elif r_recency[cluster] >= len(profile) - 1:
-            labels[cluster] = "At-Risk Customers"
-        elif r_frequency[cluster] <= 2 and r_active[cluster] <= 2:
-            labels[cluster] = "Loyal Customers"
-        elif r_active[cluster] == len(profile):
-            labels[cluster] = "New Customers"
-        else:
-            labels[cluster] = "Low-Value Customers"
+    # 1. VIP Customers (Highest Monetary)
+    vip_cluster = profile.loc[remaining_clusters, "Monetary"].idxmax()
+    assigned_labels[vip_cluster] = "VIP Customers"
+    remaining_clusters.remove(vip_cluster)
 
-    customers["Segment"] = customers["Cluster"].map(labels)
+    if remaining_clusters:
+        # 2. Loyal Customers (Highest ActiveDays among remaining)
+        loyal_cluster = profile.loc[remaining_clusters, "ActiveDays"].idxmax()
+        assigned_labels[loyal_cluster] = "Loyal Customers"
+        remaining_clusters.remove(loyal_cluster)
+
+    if remaining_clusters:
+        # 3. At-Risk Customers (Highest Recency among remaining)
+        at_risk_cluster = profile.loc[remaining_clusters, "Recency"].idxmax()
+        assigned_labels[at_risk_cluster] = "At-Risk Customers"
+        remaining_clusters.remove(at_risk_cluster)
+
+    if remaining_clusters:
+        # 4. New Customers (Lowest Recency among remaining)
+        new_cluster = profile.loc[remaining_clusters, "Recency"].idxmin()
+        assigned_labels[new_cluster] = "New Customers"
+        remaining_clusters.remove(new_cluster)
+
+    # 5. Low-Value Customers (Leftovers)
+    for c in remaining_clusters:
+        assigned_labels[c] = "Low-Value Customers"
+
+    customers["Segment"] = customers["Cluster"].map(assigned_labels)
     return customers, profile
 
 
@@ -187,6 +192,11 @@ if __name__ == "__main__":
     # 1. Load features
     customers = pd.read_csv(FEATURES_CSV, dtype={"CustomerID": str})
     X = customers[CLUSTER_FEATURES].copy()
+
+    # Apply log1p transform to right-skewed features before scaling
+    skewed_features = ["Recency", "Frequency", "Monetary", "AvgOrderValue", "UniqueProducts"]
+    for col in skewed_features:
+        X[col] = np.log1p(X[col])
 
     # 2. Scale  (RobustScaler: uses median & IQR, ignores extreme outliers)
     scaler   = RobustScaler()
