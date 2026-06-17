@@ -66,3 +66,50 @@ The model selection was optimized using the Elbow Curve and Silhouette Coefficie
 ### Fairness, Bias & Equity
 *   **Bias in Marketing Exclusion:** Categorizing customers into segments like "Low-Value" or "At-Risk" can create feedback loops. If "Low-Value" customers are excluded from promotions, they will never transition to "Loyal" or "VIP" tiers, creating a self-fulfilling prophecy. Marketing teams should introduce randomized controls to verify promotions across all segments.
 *   **Cancellation Rate Flagging:** The inclusion of `CancellationRate` as a feature flags customers who return items frequently. While crucial for logistics, these labels must not be used to automatically suspend accounts or deny customer service without manual oversight, as cancellations can occur due to shipping defects or sizing mistakes.
+*   **Temporal Displacement Risk:** The training cohort spans Dec 2010 – Dec 2011. Customers labelled "At-Risk" based on historical recency may simply be from an earlier era of the business and no longer active for structural reasons (geography, product discontinuation). Segment labels should be communicated with this temporal caveat.
+
+---
+
+## 3. Deployment Checklist
+
+Before using this model in a production marketing pipeline, the following conditions must be verified:
+
+| Requirement | Status | Notes |
+|---|---|---|
+| Dataset refresh | Required monthly | Pipeline must ingest a new transactional export |
+| Feature parity check | Automated | Assert all 7 features are present and non-null before inference |
+| Scaler serialisation | Done | `RobustScaler` saved inside `best_clustering_pipeline.joblib` |
+| Model version tag | Done | Version 1.0.0 logged in this card |
+| Segment label audit | Manual | Marketing lead must review VIP/Loyal/At-Risk definitions quarterly |
+| Outlier pre-screening | Recommended | Flag customers with Monetary > £50,000 for manual review before bulk email |
+| Data residency | Required | `retail.db` must remain on-premise or in a GDPR-compliant cloud region |
+
+---
+
+## 4. Monitoring & Retraining Plan
+
+| Event | Trigger | Action |
+|---|---|---|
+| Silhouette Score drops below 0.25 | Monthly re-evaluation run | Retrain model with new data; evaluate K again |
+| Segment size imbalance exceeds 70/20/10 split | Monthly report | Re-evaluate K or re-label segments |
+| New transaction features added (e.g., channel, geography) | Schema change event | Retrain full pipeline; update this model card |
+| Business segment definition change | Stakeholder request | Update label heuristic in `train_cluster_models.py` and re-profile |
+
+---
+
+## 5. Regulatory Compliance Notes
+
+*   **GDPR (EU 2016/679):** All training data uses pseudonymous `CustomerID` codes — no personal identifiers are processed. The pipeline complies with the data minimisation principle (Article 5(1)(c)).
+*   **Right to Explanation:** Since K-Means is a transparent, distance-based model, each cluster assignment can be explained in plain language (e.g., "You were placed in the Loyal segment because your average order frequency is 31.6 orders and your last purchase was 48 days ago.").
+*   **Automated Decision-Making:** This model must **not** be used as the sole basis for decisions that have significant legal or contractual effects on individuals (GDPR Article 22). All segment-based actions (promotions, account holds) require human review.
+
+---
+
+## 6. Revision History
+
+| Version | Date | Author | Changes |
+|---|---|---|---|
+| 0.1.0 | 2026-06-14 | Hamza Amhidi & Mouaad Kaddouri | Initial K-Means baseline (no log transform) |
+| 0.9.0 | 2026-06-14 | Hamza Amhidi & Mouaad Kaddouri | Added log1p + RobustScaler; fixed single-cluster collapse |
+| 1.0.0 | 2026-06-17 | Hamza Amhidi & Mouaad Kaddouri | Final evaluation (K=3, Silhouette=0.3093); added deployment checklist, monitoring plan, and GDPR notes |
+
