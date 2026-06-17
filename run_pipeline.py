@@ -70,7 +70,12 @@ if args.input:
     df_raw = load_custom_input(args.input)
 else:
     load_describe_data.download_dataset()
-    df_raw = load_describe_data.load_data(load_describe_data.RAW_FILE)
+    if os.path.exists(RAW_CSV):
+        print(f"[INFO] Loading raw data from CSV: {RAW_CSV}")
+        df_raw = pd.read_csv(RAW_CSV, dtype={"CustomerID": str, "InvoiceNo": str})
+        df_raw["InvoiceDate"] = pd.to_datetime(df_raw["InvoiceDate"])
+    else:
+        df_raw = load_describe_data.load_data(load_describe_data.RAW_FILE)
 
 load_describe_data.audit(df_raw)
 os.makedirs("data/raw", exist_ok=True)
